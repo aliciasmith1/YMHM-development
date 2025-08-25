@@ -4,6 +4,8 @@ This repository contains the analysis scripts and data processing code for a two
 
 ---
 
+## Overview
+
 In this two-part study, we developed and validated a digital, youth-centric self-report mental health questionnaire that measures scores on four core transdiagnostic symptom clusters identified using a novel data-driven, machine learning-based approach:
 
 1. **Uncontrollable Thinking Patterns**  
@@ -25,6 +27,8 @@ Internal consistency
 Construct validity
 Predictive validity
 
+
+---
 
 ## Repository Structure
 
