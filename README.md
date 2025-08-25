@@ -2,7 +2,7 @@
 
 This repository contains the analysis scripts and data processing code for a two-part study that developed and validated the Youth Mental Health Map (YMHM) – a digital, youth-centric self-report questionnaire designed to assess transdiagnostic mental health symptoms in young people.
 
---
+---
 
 In this two-part study, we developed and validated a digital, youth-centric self-report mental health questionnaire that measures scores on four core transdiagnostic symptom clusters identified using a novel data-driven, machine learning-based approach:
 
