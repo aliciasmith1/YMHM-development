@@ -1,4 +1,4 @@
-*Youth Mental Health Map (YMHM) – Analysis Repository
+# Youth Mental Health Map (YMHM) – Analysis Repository
 
 This repository contains the analysis scripts and data processing code for a two-part study that developed and validated the Youth Mental Health Map (YMHM) – a digital, youth-centric self-report questionnaire designed to assess transdiagnostic mental health symptoms in young people.
 
