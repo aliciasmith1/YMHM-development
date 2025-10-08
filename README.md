@@ -1,4 +1,4 @@
-# Youth Mental Health Map (YMHM) – Analysis Repository
+# Youth Mental Health Map (YMHM) – Analysis Repository and Questionnaire Scoring
 
 This repository contains the analysis scripts for a two-part study that developed and validated the Youth Mental Health Map (YMHM) – a digital, youth-centric self-report questionnaire designed to assess transdiagnostic mental health symptoms in young people.
 
@@ -41,6 +41,15 @@ A figure is generated to illustrate the score distributions, and the resulting s
 - YMHM_scoring_R.ipynb
   
 This notebook provides the same scoring procedure implemented in R, following the same computation and visualisation steps.
+
+
+---
+
+## Study analysis
+
+Analyses for Study 1 and Study 2 are contained in this repository. Study 1 scripts were used for the development of the Youth Mental Health Map (e.g., factor analyses and item reduction), and Study 2 for the validation process.
+
+All analyses were conducted in R and Python and annotated scripts are provided in the relevant folders.
 
 
 
