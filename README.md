@@ -30,4 +30,18 @@ Predictive validity
 
 ---
 
+## YMHM Questionnaire Scoring
+
+YMHM_scoring_Python.ipynb
+This notebook explains how to calculate scores for each of the four Youth Mental Health Map dimensions from raw questionnaire data using Python.
+Each item is multiplied by its corresponding factor weight, the weighted item scores are summed, and the model intercept is added to produce the final factor scores for each dimension.
+A figure is generated to illustrate the score distributions, and the resulting scores are added back into the original dataset.
+
+YMHM_scoring_R.ipynb
+This notebook provides the same scoring procedure implemented in R, following the same computation and visualisation steps.
+
+
+
+
+
 
