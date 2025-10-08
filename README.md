@@ -1,6 +1,9 @@
 # Youth Mental Health Map (YMHM) – Questionnaire Scoring and Study Analysis
 
-This repository contains the analysis scripts for a two-part study that developed and validated the Youth Mental Health Map (YMHM) – a digital, youth-centric self-report questionnaire designed to assess transdiagnostic mental health symptoms in young people.
+The Youth Mental Health Map is a digital, youth-centric self-report questionnaire designed to assess transdiagnostic mental health symptoms in young people.
+
+This repository contains the analysis scripts for the two-part study that developed and validated the Youth Mental Health Map, as well as code (both in Python and R) that can be used for scoring the four Youth Mental Health Map dimensions.
+
 
 ---
 
@@ -30,21 +33,6 @@ Predictive validity
 
 ---
 
-## YMHM Questionnaire Scoring
-
-- YMHM_scoring_Python.ipynb
-  
-This notebook explains how to calculate scores for each of the four Youth Mental Health Map dimensions from raw questionnaire data using Python.
-Each item is multiplied by its corresponding factor weight, the weighted item scores are summed, and the model intercept is added to produce the final factor scores for each dimension.
-A figure is generated to illustrate the score distributions, and the resulting scores are added back into the original dataset.
-
-- YMHM_scoring_R.ipynb
-  
-This notebook provides the same scoring procedure implemented in R, following the same computation and visualisation steps.
-
-
----
-
 ## Study analysis
 
 Analyses for Study 1 and Study 2 are contained in this repository. Study 1 scripts were used for the development of the Youth Mental Health Map (e.g., factor analyses and item reduction), and Study 2 for the validation process.
@@ -52,7 +40,19 @@ Analyses for Study 1 and Study 2 are contained in this repository. Study 1 scrip
 All analyses were conducted in R and Python and annotated scripts are provided in the relevant folders.
 
 
+---
 
+## Questionnaire Scoring
+
+YMHM_scoring_Python.ipynb
+  
+This notebook explains how to calculate scores for each of the four Youth Mental Health Map dimensions from raw questionnaire data using Python.
+Each item is multiplied by its corresponding factor weight, the weighted item scores are summed, and the model intercept is added to produce the final factor scores for each dimension.
+A figure is generated to illustrate the score distributions, and the resulting scores are added back into the original dataset.
+
+YMHM_scoring_R.ipynb
+  
+This notebook provides the same scoring procedure implemented in R, following the same computation and visualisation steps.
 
 
 
