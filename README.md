@@ -30,13 +30,4 @@ Predictive validity
 
 ---
 
-## Repository Structure
 
-├── study1/
-│ ├── analysis/ # Scripts for EFA
-│ ├── question_reduction/ # Scripts for item reduction
-│
-├── study2/
-│ ├── analysis/ # Validation analyses (test-retest, internal consistency, construct validity, predictive validity)
-│
-└── README.md # Project overview
