@@ -9,7 +9,7 @@ This repository contains the analysis scripts for the two-part study that develo
 
 ## Overview
 
-In this two-part study, we developed and validated a digital, youth-centric self-report mental health questionnaire that measures scores on four core transdiagnostic symptom clusters identified using a novel data-driven, machine learning-based approach:
+In this four-part study, we developed and validated a digital, youth-centric self-report mental health assessment that measures scores on four core transdiagnostic symptom clusters identified using a novel data-driven, machine learning-based approach:
 
 1. **Uncontrollable Thinking Patterns**  
 2. **Re-experiencing Difficult Events**  
@@ -30,12 +30,21 @@ Internal consistency
 Construct validity
 Predictive validity
 
+**Study 3 (Clinician Feedback):**
+
+Added value
+Feasibility
+Acceptability
+
+**Study 4 (Treatment Allocation):**
+
+Hierarchical Bayesian logistic regression to determine the suitability of each treatment technique for each transdiagnostic dimension
 
 ---
 
 ## Study analysis
 
-Analyses for Study 1 and Study 2 are contained in this repository. Study 1 scripts were used for the development of the Youth Mental Health Map (e.g., factor analyses and item reduction), and Study 2 for the validation process.
+Analyses for Study 1, 2, 3 and 4 are contained in this repository. Study 1 scripts were used for the development of the Youth Mental Health Map (e.g., factor analyses and item reduction), Study 2 for the validation process, Study 3 for clinician feedback, and Study 4 for determining the most appropriate treatment technique for each transdiagnostic dimension.
 
 All analyses were conducted in R and Python and annotated scripts are provided in the relevant folders.
 
