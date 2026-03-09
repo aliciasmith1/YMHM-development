@@ -1,0 +1,433 @@
+---
+title: "Study 4 analysis"
+author: "Alicia Smith"
+date: "2026-03-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Setup}
+library(brms)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(posterior)
+library(stringr)
+library(tidyverse)
+
+set.seed(123)
+
+
+df_general <- read_csv("df_general.csv", show_col_types = F)
+df_prolific <- read_csv("df_prolific.csv", show_col_types = F)
+
+df <- rbind(df_general, df_prolific) |>
+      filter(Progress == 100 & RegStatus != 4) |>
+      subset(select = -c(Progress))
+
+vig <- read_csv("scoring_profiles.csv")
+
+tech_list <- read_csv("techniques.csv")
+
+```
+
+```{r Demographics}
+# Save demographics
+demo <- df[, 1:11]
+
+clin_age <- mean(demo$Age, na.rm = TRUE)
+clin_age_sd <- sd(demo$Age, na.rm = TRUE)
+print(paste0("The mean age of all 95 participants was: ", clin_age))
+print(paste0("The SD was: ", clin_age_sd))
+
+gender <- demo |> 
+  count(Gender) |>                    
+  mutate(percent = scales::percent(n / sum(n))) 
+gender
+
+culture <- demo |> 
+  count(Culture) |>                    
+  mutate(percent = scales::percent(n / sum(n))) 
+culture
+
+culture_other <- na.omit(demo$Culture_12_TEXT)
+print(paste0("Other cultures: ", paste(unique(culture_other), collapse = "; ")))
+
+role <- demo |> 
+  count(RegStatus) |>                    
+  mutate(percent = scales::percent(n / sum(n))) 
+role
+
+
+experience <- mean(demo$Years_exp, na.rm = TRUE)
+experience_sd <- sd(demo$Years_exp, na.rm = TRUE)
+print(paste0("The mean number of years of experience was: ", experience))
+print(paste0("The SD was: ", experience_sd))
+
+service <- demo |> 
+  count(Service) |>                    
+  mutate(percent = scales::percent(n / sum(n))) 
+service
+
+service_other <- na.omit(demo$Service_7_TEXT)
+print(paste0("Other roles: ", paste(unique(service_other), collapse = "; ")))
+```
+
+
+```{r Wrangle}
+
+# Save K10-related columns
+k10_df <- df[, c(1, 434:454)]
+
+
+
+# Recode
+# Treatments not picked = 0
+for (v in 1:20) {
+  
+  seen_col <- paste0("V", v, "_tx")
+  
+  df <- df |> 
+    mutate(
+      across(
+        starts_with(paste0("V", v, "_tx_rank_")),
+        ~ replace(., !is.na(.data[[seen_col]]) & is.na(.), 0)
+      )
+    )
+}
+
+
+
+# Remove K10 columns
+df <- df %>%
+  dplyr::select(-matches("^K10(_tx(_rank_\\d+)?|$)"))
+
+# Remove unneeded vignette columns
+df <- df %>%
+  dplyr::select(-matches("^V\\d+_tx$"))
+
+# Convert to long format
+long_df <- df |> 
+  pivot_longer(
+    cols = matches("^V\\d+_tx_rank_"),
+    names_to = c("vignette", "technique_id"),
+    names_pattern = "V(\\d+)_tx_rank_(\\d+)",
+    values_to = "rank"
+  )
+
+# Add a "selected" variable
+long_df <- long_df |> 
+  mutate(selected = ifelse(is.na(rank), NA,
+                           ifelse(rank == 0, 0, 1)))
+
+long_df <- merge(long_df, vig, by = "vignette")
+
+long_df <- long_df |>
+  mutate(
+    technique_id = factor(technique_id),
+    vignette = factor(vignette),
+    ID = factor(ID)
+  )
+
+
+long_df <- long_df |>
+  filter(!is.na(rank))
+
+long_df <- long_df |>
+  mutate(
+    rank_cat = case_when(
+      rank == 0 ~ 0,
+      rank == 5 ~ 1,
+      rank == 4 ~ 2,
+      rank == 3 ~ 3,
+      rank == 2 ~ 4,
+      rank == 1 ~ 5
+    )
+  )
+
+long_df <- long_df |>
+  mutate(
+    rank_cat = factor(rank_cat,
+                      levels = 0:5,
+                      ordered = TRUE)
+  )
+
+```
+
+```{r Bayesian Hierarchical Logisitic Model}
+
+
+fit_ord <- brm(
+  rank_cat ~ technique_id * (z1 + z2 + z3 + z4) +
+             (1 | ID) + 
+             (1 | vignette),
+  data = long_df,
+  family = cumulative(link = "logit"),
+  cores = 4, chains = 4, iter = 2000, seed = 123
+)
+
+summary(fit_ord)
+
+```
+
+
+```{r Expected suitability for each Dimension × Technique}
+
+
+dims <- c("z1","z2","z3","z4")
+mid  <- 5
+low  <- 2
+high <- 8
+
+delta_expected_suitability <- function(dim_name){
+  
+  techs <- levels(long_df$technique_id)
+  
+  new_low <- data.frame(
+    z1 = mid, z2 = mid, z3 = mid, z4 = mid,
+    technique_id = factor(techs, levels = techs)
+  )
+  
+  new_high <- new_low
+  
+  new_low[[dim_name]]  <- low
+  new_high[[dim_name]] <- high
+  
+  p_low  <- posterior_epred(fit_ord, newdata=new_low,  re_formula = NA)
+  p_high <- posterior_epred(fit_ord, newdata=new_high, re_formula = NA)
+  
+  # rank values 0:5
+  rank_vals <- 0:5
+  
+  # Compute expected value for each draw and technique
+  E_low  <- apply(p_low,  c(1,2), function(p) sum(p * rank_vals))
+  E_high <- apply(p_high, c(1,2), function(p) sum(p * rank_vals))
+  
+  delta  <- E_high - E_low
+  
+  summary_delta <- apply(delta, 2,
+                         function(x) c(mean = mean(x),
+                                       l = quantile(x, .025),
+                                       u = quantile(x, .975)))
+  
+  out <- as.data.frame(t(summary_delta))
+  out$technique_id <- techs
+  out$dimension <- dim_name
+  
+  out
+}
+
+dim_maps <- bind_rows(lapply(dims, delta_expected_suitability))
+
+
+```
+
+
+```{r Rank techniques for each dimension}
+
+ranked_maps <- dim_maps %>%
+  group_by(dimension) %>%
+  arrange(desc(mean), .by_group = TRUE) %>%
+  mutate(direction = ifelse(mean > 0, "increases", "decreases")) %>%
+  ungroup() %>%
+  mutate(dimension = recode(dimension, 'z1' = 'Uncontrollable thinking patterns',
+                            'z2' = 'Re-experiencing difficult events',
+                            'z3' = 'Rigid high standards',
+                            'z4' = 'Emotional agency'))
+ranked_maps <- merge(ranked_maps, tech_list, by = "technique_id")
+
+print(ranked_maps)
+
+ranked_maps$dimension <- as_factor(ranked_maps$dimension)
+
+```
+
+
+```{r Heatmap}
+
+ggplot(ranked_maps,
+       aes(x = dimension,
+           y = reorder(technique, mean),
+           fill = mean)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.2f", mean)), size = 3) +
+  scale_fill_gradient2(low = "blue",
+                       mid = "white",
+                       high = "red",
+                       midpoint = 0) +
+  labs(title = "Change in Expected Suitability",
+       x = "Dimension",
+       y = "Treatment Technique",
+       fill = "Δ Expected\nSuitability") +
+  theme_minimal()
+
+```
+
+
+
+```{r K10 data wrangling}
+
+# Convert to long format
+long_k10_df <- k10_df %>%
+  pivot_longer(
+    cols = starts_with("K10_tx_rank_"),
+    names_to = "technique_id",
+    names_pattern = "K10_tx_rank_(\\d+)",
+    values_to = "rank"
+  )
+
+long_k10_df <- long_k10_df %>%
+  mutate(rank = ifelse(is.na(rank), 0, rank))
+
+long_k10_df <- long_k10_df %>%
+  mutate(
+    rank_cat = case_when(
+      rank == 0 ~ 0,
+      rank == 5 ~ 1,
+      rank == 4 ~ 2,
+      rank == 3 ~ 3,
+      rank == 2 ~ 4,
+      rank == 1 ~ 5
+    ),
+    rank_cat = factor(rank_cat,
+                      levels = 0:5,
+                      ordered = TRUE),
+    technique_id = factor(technique_id),
+    ID = factor(ID)
+  )
+```
+
+
+```{r K10 analysis}
+
+fit_k10 <- brm(
+  rank_cat ~ technique_id * K10 +
+             (1 | ID),
+  data = long_k10_df,
+  family = cumulative(link = "logit"),
+  cores = 4, chains = 4, iter = 2000
+)
+
+```
+
+```{r}
+low_k10  <- 20
+high_k10 <- 25
+mid_k10  <- 30
+
+delta_expected_k10 <- function(){
+  
+  techs <- levels(long_k10_df$technique_id)
+  
+  new_low <- data.frame(
+    K10 = low_k10,
+    technique_id = factor(techs, levels = techs)
+  )
+  
+  new_high <- data.frame(
+    K10 = high_k10,
+    technique_id = factor(techs, levels = techs)
+  )
+  
+  # posterior category probabilities
+  p_low  <- posterior_epred(fit_k10, newdata = new_low,  re_formula = NA)
+  p_high <- posterior_epred(fit_k10, newdata = new_high, re_formula = NA)
+  
+  rank_vals <- 0:5
+  
+  # Expected suitability
+  E_low  <- apply(p_low,  c(1,2), function(p) sum(p * rank_vals))
+  E_high <- apply(p_high, c(1,2), function(p) sum(p * rank_vals))
+  
+  delta <- E_high - E_low
+  
+  summary_delta <- apply(delta, 2,
+                         function(x) c(mean = mean(x),
+                                       l = quantile(x, .025),
+                                       u = quantile(x, .975)))
+  
+  out <- as.data.frame(t(summary_delta))
+  out$technique_id <- techs
+  out$dimension <- "K10"
+  
+  out
+}
+
+k10_maps <- delta_expected_k10()
+
+combined_maps <- bind_rows(dim_maps, k10_maps)
+
+ranked_maps <- combined_maps %>%
+  group_by(dimension) %>%
+  arrange(desc(mean), .by_group = TRUE) %>%
+  mutate(direction = ifelse(mean > 0, "increases", "decreases")) %>%
+  ungroup() %>%
+  mutate(dimension = recode(dimension, 'z1' = 'Uncontrollable thinking patterns',
+                            'z2' = 'Re-experiencing difficult events',
+                            'z3' = 'Rigid high standards',
+                            'z4' = 'Emotional agency'))
+ranked_maps <- merge(ranked_maps, tech_list, by = "technique_id")
+
+ranked_maps$dimension <- factor(ranked_maps$dimension,
+                                  levels = c("Uncontrollable thinking patterns","Re-experiencing difficult events","Rigid high standards","Emotional agency","K10"))
+
+maps_ordered <- ranked_maps[order(ranked_maps$dimension),] %>%
+  dplyr::mutate(across(c("mean", "l.2.5%", "u.97.5%"), round, 2)) %>%
+  subset(select = -c(direction, technique_id))
+
+write.csv(maps_ordered, "technique_CI.csv", row.names = FALSE)
+
+ggplot(ranked_maps,
+       aes(x = dimension,
+           y = reorder(technique, mean),
+           fill = mean)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.2f", mean)), size = 3) +
+  scale_fill_gradient2(low = "blue",
+                       mid = "white",
+                       high = "red",
+                       midpoint = 0) +
+  scale_y_reordered() +
+  labs(title = "Change in Expected Suitability",
+       x = "Mental Health Dimension",
+       y = "Treatment Technique",
+       fill = "Δ Expected\nSuitability") +
+  theme_minimal()
+```
+
+
+
+
+```{r Bayesian Hierarchical Logisitic Model - add clinical variables}
+
+# Ensure correct data types
+long_df <- long_df |>
+  mutate(
+    RegStatus = factor(RegStatus),
+    Service = factor(Service),
+    Years_exp = as.numeric(Years_exp),
+  )
+
+
+fit_adj <- brm(
+  rank_cat ~ technique_id * (z1 + z2 + z3 + z4) +
+             RegStatus + Years_exp + Service +
+             (1 | ID) +
+             (1 | vignette),
+  data = long_df,
+  family = cumulative(link = "logit"),
+  cores = 4, chains = 4, iter = 2000, seed = 123
+)
+
+loo_base <- loo(fit_ord)
+loo_adj  <- loo(fit_adj)
+
+loo_compare(loo_base, loo_adj)
+
+```
+
+
+

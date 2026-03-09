@@ -1,0 +1,808 @@
+---
+title: "Study 3 analysis"
+author: "Alicia Smith"
+date: "2026-03-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::knit_hooks$set(purl = knitr::hook_purl)
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r}
+library(tidyverse)
+library(effectsize)
+library(scales)
+library(ggpubr)
+library(tidyr)
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(ggtext)
+library(colorspace)
+library(ragg)
+library(effsize)
+
+
+
+
+dataset_pre_1 <- read_csv("Study3_pre_1.csv", show_col_types = F)
+dataset_pre_2 <- read_csv("Study3_pre_2.csv", show_col_types = F)
+dataset_pre <- rbind(dataset_pre_1, dataset_pre_2)
+
+dataset_post <- read_csv("study3_post.csv", show_col_types = F)
+
+df_merged <- merge(dataset_pre, dataset_post, by = "ID")
+
+```
+
+
+```{r Demographics}
+
+clin_age <- mean(df_merged$clin_age, na.rm = TRUE)
+clin_age_sd <- sd(df_merged$clin_age, na.rm = TRUE)
+print(paste0("The mean age of all 21 participants was: ", clin_age))
+print(paste0("The SD was: ", clin_age_sd))
+
+gender <- df_merged |> 
+  count(clin_gender) |>                    
+  mutate(percent = scales::percent(n / sum(n))) 
+gender
+
+åculture <- df_merged |> 
+  count(Culture_post) |>                    
+  mutate(percent = scales::percent(n / sum(n))) 
+culture
+
+culture_other <- na.omit(df_merged$Culture_12_TEXT_post)
+print(paste0("Other cultures: ", paste(unique(culture_other), collapse = "; ")))
+
+role <- df_merged |> 
+  count(clin_role) |>                    
+  mutate(percent = scales::percent(n / sum(n))) 
+role
+
+role_other <- na.omit(df_merged$clin_role_6_TEXT)
+print(paste0("Other roles: ", paste(unique(role_other), collapse = "; ")))
+
+experience <- mean(df_merged$clin_experience)
+experience_sd <- sd(df_merged$clin_experience)
+print(paste0("The mean number of years of experience was: ", experience))
+print(paste0("The SD was: ", experience_sd))
+
+service <- df_merged |> 
+  count(clin_service) |>                    
+  mutate(percent = scales::percent(n / sum(n))) 
+service
+
+service_other <- na.omit(df_merged$clin_service_TEXT)
+print(paste0("Other roles: ", paste(unique(service_other), collapse = "; ")))
+```
+
+
+```{r Current tool}
+
+tool_use <- df_merged |>
+  count(clin_tool1) |>
+  mutate(percent = scales::percent(n / sum(n)))
+tool_use
+
+# Value
+pre_value <- df_merged |> 
+  select("clin_pre_value1":"clin_pre_value4")
+desc_val_pre <- rstatix::get_summary_stats(pre_value)
+desc_val_pre
+
+```
+
+
+```{r Plots}
+
+value_long <- df_merged %>%
+  select(clin_pre_value1:clin_pre_value4) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "item",
+    values_to = "rating"
+  ) %>%
+  mutate(
+    rating = as.integer(rating),
+    item = recode(item,
+      clin_pre_value1 = "Helped identify key processes",
+      clin_pre_value2 = "Helped identify suitable treatment",
+      clin_pre_value3 = "Helped identify additional services",
+      clin_pre_value4 = "Enabled discussions with client"
+    )
+  ) %>%
+  filter(!is.na(rating), rating %in% 1:5)
+
+value_summary <- value_long %>%
+  group_by(item) %>%
+  summarise(
+    n = sum(!is.na(rating)),
+    median = median(rating, na.rm = TRUE),
+    q1 = quantile(rating, 0.25, na.rm = TRUE),
+    q3 = quantile(rating, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(value_summary, aes(x = median, y = fct_rev(item))) +
+  geom_errorbarh(aes(xmin = q1, xmax = q3), height = 0.2, linewidth = 0.6) +
+  geom_point(size = 2.5) +
+  scale_x_continuous(breaks = 1:5, limits = c(1, 5)) +
+  labs(
+    x = "Median rating (IQR)",
+    y = NULL,
+    title = "Perceived value",
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.major.y = element_blank())
+
+
+
+```
+
+
+```{r YMHM feedback}
+# Only analyse results of those who used the tool
+YMHM_use <- filter(df_merged, clin_percent != 0)
+
+# Clients used with
+clients <- mean(YMHM_use$clin_percent, na.rm = TRUE)
+print(paste0("Mean percentage of clients that the tool was used with: ", clients))
+clients_sd <- sd(YMHM_use$clin_percent, na.rm = TRUE)
+print(paste0("SD: ", clients_sd))
+
+# 4 week use
+month_use <- YMHM_use |> 
+  count(clin_4weeks) |>                    
+  mutate(percent = scales::percent(n / sum(n))) 
+month_use
+
+```
+
+```{r Perceived value}
+
+# Value
+post_value <- YMHM_use |> 
+  select("clin_post_value1":"clin_post_value4")
+desc_val_post <- rstatix::get_summary_stats(post_value)
+desc_val_post
+
+
+df_paired <- YMHM_use %>%
+  mutate(
+    value_current = rowMeans(
+      select(., clin_pre_value1:clin_pre_value4),
+      na.rm = FALSE
+    ),
+    value_ymhm = rowMeans(
+      select(., clin_post_value1:clin_post_value4),
+      na.rm = FALSE
+    )
+  ) %>%
+  filter(!is.na(value_current) & !is.na(value_ymhm))
+
+df_paired %>% 
+  summarize(mean = mean(value_current), sd = sd(value_current))
+
+df_paired %>% 
+  summarize(mean = mean(value_ymhm), sd = sd(value_ymhm))
+
+t_test_result <- t.test(
+  df_paired$value_ymhm,
+  df_paired$value_current,
+  paired = TRUE
+)
+
+t_test_result
+
+cohens_d <- effsize::cohen.d(
+  df_paired$value_ymhm,
+  df_paired$value_current,
+  paired = TRUE
+)
+
+cohens_d
+
+
+# Reshape to long format
+plot_data <- df_paired %>%
+  select(value_current, value_ymhm) %>%
+  mutate(id = row_number()) %>%
+  pivot_longer(
+    cols = c(value_current, value_ymhm),
+    names_to = "tool",
+    values_to = "score"
+  ) %>%
+  mutate(
+    tool = recode(tool,
+                  value_current = "Current tools",
+                  value_ymhm = "Youth Mental Health Map")
+  )
+
+pal <- c("#A034F0", "#159090")
+
+bar <- ggplot(plot_data, aes(x = tool, y = score, fill = tool)) +
+  geom_bar(
+    stat = "summary",
+    fun = "mean",
+    width = 0.5,
+    alpha = 0.7
+  ) +
+  geom_errorbar(
+    stat = "summary",
+    fun.data = mean_se,
+    width = 0.15,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = pal) +
+scale_y_continuous(breaks = 1:5) +
+coord_cartesian(ylim = c(1, 5)) +
+  labs(
+    x = NULL,
+    y = "Perceived value (mean)",
+    title = "Perceived Value"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+
+```
+
+
+``` {r feasibility and acceptability}
+
+# Feasibility *** need to reverse score feas4
+YMHM_use[ , "clin_post_feas4"] = 6 - YMHM_use[ , "clin_post_feas4"]
+post_feas <- YMHM_use |> 
+  select("clin_post_feas2":"clin_post_feas4")
+desc_feas_post <- rstatix::get_summary_stats(post_feas)
+desc_feas_post
+
+barrier <- YMHM_use |> 
+  count(clin_post_feas5) |>                    
+  mutate(percent = scales::percent(n / sum(n))) 
+barrier
+
+# Acceptability
+post_accept <- YMHM_use |> 
+  subset(select = c("clin_post_accept1","clin_post_accept2","clin_post_accept4"))
+desc_accept_post <- rstatix::get_summary_stats(post_accept)
+desc_accept_post
+
+
+accept <- YMHM_use |> 
+  count(clin_post_accept3) |>                     
+  mutate(
+    prop = n / sum(n),
+    percent = scales::percent(prop),
+    response = recode(as.character(clin_post_accept3),
+                      "1" = "Yes",
+                      "2" = "No"),
+    response = factor(response, levels = c("Yes", "No"))
+  )
+
+pal <- c("Yes" = "#F6AC50",
+         "No"  = "#FF8C00")
+
+continue_use <- ggplot(accept, aes(x = "", y = prop, fill = response)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  geom_text(aes(label = percent),
+            position = position_stack(vjust = 0.6),
+            color = "white",
+            size = 3.5,
+            fontface = "bold") +
+  coord_polar(theta = "y") +
+  scale_fill_manual(values = pal) +
+  labs(
+    fill = "Tool Adoption"
+  ) +
+  theme_void(base_size = 14) +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(face = "bold")
+  )
+
+
+```
+
+```{r Plot - value}
+
+value_long <- YMHM_use %>%
+  select(clin_post_value1:clin_post_value4) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "item",
+    values_to = "rating"
+  ) %>%
+  mutate(
+    rating = as.integer(rating),
+    item = recode(item,
+      clin_post_value1 = "Helped identify key processes",
+      clin_post_value2 = "Helped identify suitable treatment",
+      clin_post_value3 = "Helped identify additional services",
+      clin_post_value4 = "Enabled discussions with client"
+    )
+  ) %>%
+  filter(!is.na(rating), rating %in% 1:5)
+
+value_summary <- value_long %>%
+  group_by(item) %>%
+  summarise(
+    n = sum(!is.na(rating)),
+    median = median(rating, na.rm = TRUE),
+    q1 = quantile(rating, 0.25, na.rm = TRUE),
+    q3 = quantile(rating, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+pal <- c("#FF8C00", "#A034F0", "#159090", "#76EEC6")
+add_sample <- function(x) {
+  return(c(y = max(x) + .025, 
+           label = length(x)))
+}
+
+
+value <- ggplot(value_long, aes(x = rating, y = fct_rev(item), fill = item)) +
+  geom_violin(
+    trim = FALSE,
+    scale = "width",
+    alpha = 0.5
+  ) +
+  geom_boxplot(
+    width = 0.1,
+    outlier.shape = NA,
+    alpha = 0.7
+  ) +
+  geom_jitter(
+    width = 0.1,
+    height = 0,
+    alpha = 0.4,
+    size = 2
+  ) +
+  scale_x_continuous(limits = c(1, 5), breaks = 1:5) +
+  scale_fill_manual(values = pal) +
+  labs(
+    x = "Rating",
+    y = NULL,
+    title = "Perceived Value of the Youth Mental Health Map"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    legend.position = "none"
+  )
+
+
+
+
+```
+
+```{r Plot - feasibility}
+
+value_long <- YMHM_use %>%
+  select(clin_post_feas2:clin_post_feas4) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "item",
+    values_to = "rating"
+  ) %>%
+  mutate(
+    rating = as.integer(rating),
+    item = recode(item,
+      clin_post_feas2 = "Easy to integrate",
+      clin_post_feas3 = "Easy to interpret",
+      clin_post_feas4 = "No assistance required"
+    )
+  ) %>%
+  filter(!is.na(rating), rating %in% 1:5)
+
+value_summary <- value_long %>%
+  group_by(item) %>%
+  summarise(
+    n = sum(!is.na(rating)),
+    median = median(rating, na.rm = TRUE),
+    q1 = quantile(rating, 0.25, na.rm = TRUE),
+    q3 = quantile(rating, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+pal <- c("#FF8C00", "#A034F0", "#159090")
+add_sample <- function(x) {
+  return(c(y = max(x) + .025, 
+           label = length(x)))
+}
+
+
+feas <- ggplot(value_long, aes(x = rating, y = fct_rev(item), fill = item)) +
+  geom_violin(
+    trim = FALSE,
+    scale = "width",
+    alpha = 0.5
+  ) +
+  geom_boxplot(
+    width = 0.1,
+    outlier.shape = NA,
+    alpha = 0.7
+  ) +
+  geom_jitter(
+    width = 0.1,
+    height = 0,
+    alpha = 0.4,
+    size = 2
+  ) +
+  scale_x_continuous(limits = c(1, 5), breaks = 1:5) +
+  scale_fill_manual(values = pal) +
+  labs(
+    x = "Rating",
+    y = NULL,
+    title = "Feasibility"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    legend.position = "none"
+  )
+
+
+```
+
+```{r Plot - acceptability}
+
+value_long <- YMHM_use %>%
+  subset(select = c("clin_post_accept1", "clin_post_accept2", "clin_post_accept4")) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "item",
+    values_to = "rating"
+  ) %>%
+  mutate(
+    rating = as.integer(rating),
+    item = recode(item,
+      clin_post_accept1 = "Overall rating",
+      clin_post_accept2 = "Satisfaction",
+      clin_post_accept4 = "Relevance"
+    )
+  ) %>%
+  filter(!is.na(rating), rating %in% 1:5)
+
+value_summary <- value_long %>%
+  group_by(item) %>%
+  summarise(
+    n = sum(!is.na(rating)),
+    median = median(rating, na.rm = TRUE),
+    q1 = quantile(rating, 0.25, na.rm = TRUE),
+    q3 = quantile(rating, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+pal <- c("#FF8C00", "#A034F0", "#159090")
+add_sample <- function(x) {
+  return(c(y = max(x) + .025, 
+           label = length(x)))
+}
+
+
+accept <- ggplot(value_long, aes(x = rating, y = fct_rev(item), fill = item)) +
+  geom_violin(
+    trim = FALSE,
+    scale = "width",
+    alpha = 0.5
+  ) +
+  geom_boxplot(
+    width = 0.1,
+    outlier.shape = NA,
+    alpha = 0.7
+  ) +
+  geom_jitter(
+    width = 0.1,
+    height = 0,
+    alpha = 0.4,
+    size = 2
+  ) +
+  scale_x_continuous(limits = c(1, 5), breaks = 1:5) +
+  scale_fill_manual(values = pal) +
+  labs(
+    x = "Rating",
+    y = NULL,
+    title = "Acceptability"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    legend.position = "none"
+  )
+
+
+
+```
+
+
+```{r}
+
+
+ggarrange(bar, continue_use, feas, accept,
+          ncol = 2, nrow = 2, 
+          labels = c("A", "B", "C", "D"))
+
+
+```
+
+
+```{r Clinician variables}
+
+YMHM_use <- YMHM_use %>%
+  mutate(
+    clin_role = recode(clin_role,
+      "1" = "Clinical Psychologist",
+      "2" = "Psychologist",
+      "3" = "Psychotherapist",
+      "4" = "Social Worker",
+      "5" = "Psychiatrist",
+      "6" = "Other"
+    ),
+    clin_service = recode(clin_service,
+      "1" = "Public",
+      "2" = "Private",
+      "3" = "General Practice",
+      "4" = "Community Health Service",
+      "5" = "School-based",
+      "6" = "Digital",
+      "7" = "Other"
+    ),
+    feas_yhmh = rowMeans(
+      select(., clin_post_feas2:clin_post_feas4),
+      na.rm = TRUE
+    ),
+    accept_yhmh = rowMeans(
+      select(., clin_post_accept1,clin_post_accept2,clin_post_accept4),
+      na.rm = TRUE
+    ),
+    value_yhmh = rowMeans(
+      select(., clin_post_value1:clin_post_value4),
+      na.rm = TRUE
+    )
+  )
+  
+
+feas_role_desc <- YMHM_use %>%
+  group_by(clin_role) %>%
+  summarise(
+    mean_feas = mean(feas_yhmh, na.rm = TRUE),
+    sd_feas = sd(feas_yhmh, na.rm = TRUE),
+    n = sum(!is.na(feas_yhmh))
+  )
+write.csv(feas_role_desc, "feas_role.csv")
+
+feas_service_desc <- YMHM_use %>%
+  group_by(clin_service) %>%
+  summarise(
+    mean_feas = mean(feas_yhmh, na.rm = TRUE),
+    sd_feas = sd(feas_yhmh, na.rm = TRUE),
+    n = sum(!is.na(feas_yhmh))
+  )
+write.csv(feas_service_desc, "feas_serv.csv")
+
+pal <- c("#2f357c", "#9d9cd5", "#e48171","#e69b00", "#ada43b")
+
+
+feas_role <- ggplot(YMHM_use, aes(x = clin_role, y = feas_yhmh, fill = clin_role)) +
+  geom_boxplot() +
+  geom_dotplot(binaxis='y', stackdir='center') +
+  scale_fill_manual(values = pal) +
+scale_y_continuous(breaks = 1:5) +
+coord_cartesian(ylim = c(1, 5)) +
+  labs(
+    x = NULL,
+    y = "Feasibility",
+    title = "Feasibility by Role"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+feas_service <- ggplot(YMHM_use, aes(x = clin_service, y = feas_yhmh, fill = clin_service)) +
+  geom_boxplot() +
+  geom_dotplot(binaxis='y', stackdir='center') +
+  scale_fill_manual(values = pal) +
+scale_y_continuous(breaks = 1:5) +
+coord_cartesian(ylim = c(1, 5)) +
+  labs(
+    x = NULL,
+    y = "Feasibility",
+    title = "Feasibility by Service Type"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+feas_exp <- ggplot(YMHM_use, aes(x = clin_experience, y = feas_yhmh)) +
+  geom_point(size = 3, color = "#9d9cd5") +
+  geom_smooth(method = "lm", se = TRUE, color = "#2f357c") +
+  scale_fill_manual(values = pal) +
+scale_y_continuous(breaks = 1:5) +
+coord_cartesian(ylim = c(1, 5)) +
+  labs(
+    x = "Years of Experience",
+    y = "Feasibility",
+    title = "Feasibility by Years Experience"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+cor.test(YMHM_use$clin_experience,
+         YMHM_use$feas_yhmh,
+         method = "pearson")
+
+
+accept_role_desc <- YMHM_use %>%
+  group_by(clin_role) %>%
+  summarise(
+    mean_accept = mean(accept_yhmh, na.rm = TRUE),
+    sd_accept = sd(accept_yhmh, na.rm = TRUE),
+    n = sum(!is.na(accept_yhmh))
+  )
+write.csv(accept_role_desc, "accept_role.csv")
+
+accept_service_desc <- YMHM_use %>%
+  group_by(clin_service) %>%
+  summarise(
+    mean_accept = mean(accept_yhmh, na.rm = TRUE),
+    sd_accept = sd(accept_yhmh, na.rm = TRUE),
+    n = sum(!is.na(accept_yhmh))
+  )
+write.csv(accept_service_desc, "accept_serv.csv")
+
+accept_role <- ggplot(YMHM_use, aes(x = clin_role, y = accept_yhmh, fill = clin_role)) +
+  geom_boxplot() +
+  geom_dotplot(binaxis='y', stackdir='center') +
+  scale_fill_manual(values = pal) +
+scale_y_continuous(breaks = 1:5) +
+coord_cartesian(ylim = c(1, 5)) +
+  labs(
+    x = NULL,
+    y = "Acceptability",
+    title = "Acceptability by Role"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+accept_service <- ggplot(YMHM_use, aes(x = clin_service, y = accept_yhmh, fill = clin_service)) +
+  geom_boxplot() +
+  geom_dotplot(binaxis='y', stackdir='center') +
+  scale_fill_manual(values = pal) +
+scale_y_continuous(breaks = 1:5) +
+coord_cartesian(ylim = c(1, 5)) +
+  labs(
+    x = NULL,
+    y = "Acceptability",
+    title = "Acceptability by Service Type"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+accept_exp <- ggplot(YMHM_use, aes(x = clin_experience, y = accept_yhmh)) +
+  geom_point(size = 3, color = "#9d9cd5") +
+  geom_smooth(method = "lm", se = TRUE, color = "#2f357c") +
+  scale_fill_manual(values = pal) +
+scale_y_continuous(breaks = 1:5) +
+coord_cartesian(ylim = c(1, 5)) +
+  labs(
+    x = "Years of Experience",
+    y = "Acceptability",
+    title = "Acceptability by Years Experience"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+cor.test(YMHM_use$clin_experience,
+         YMHM_use$accept_yhmh,
+         method = "pearson")
+
+
+value_role_desc <- YMHM_use %>%
+  group_by(clin_role) %>%
+  summarise(
+    mean_accept = mean(value_yhmh, na.rm = TRUE),
+    sd_accept = sd(value_yhmh, na.rm = TRUE),
+    n = sum(!is.na(value_yhmh))
+  )
+write.csv(value_role_desc, "value_role.csv")
+
+value_service_desc <- YMHM_use %>%
+  group_by(clin_service) %>%
+  summarise(
+    mean_accept = mean(value_yhmh, na.rm = TRUE),
+    sd_accept = sd(value_yhmh, na.rm = TRUE),
+    n = sum(!is.na(value_yhmh))
+  )
+write.csv(value_service_desc, "value_serv.csv")
+
+value_role <- ggplot(YMHM_use, aes(x = clin_role, y = value_yhmh, fill = clin_role)) +
+  geom_boxplot() +
+  geom_dotplot(binaxis='y', stackdir='center') +
+  scale_fill_manual(values = pal) +
+scale_y_continuous(breaks = 1:5) +
+coord_cartesian(ylim = c(1, 5)) +
+  labs(
+    x = NULL,
+    y = "Perceived Value",
+    title = "Perceived Value by Role"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+value_service <- ggplot(YMHM_use, aes(x = clin_service, y = value_yhmh, fill = clin_service)) +
+  geom_boxplot() +
+  geom_dotplot(binaxis='y', stackdir='center') +
+  scale_fill_manual(values = pal) +
+scale_y_continuous(breaks = 1:5) +
+coord_cartesian(ylim = c(1, 5)) +
+  labs(
+    x = NULL,
+    y = "Perceived Value",
+    title = "Perceived Value by Service Type"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+value_exp <- ggplot(YMHM_use, aes(x = clin_experience, y = value_yhmh)) +
+  geom_point(size = 3, color = "#9d9cd5") +
+  geom_smooth(method = "lm", se = TRUE, color = "#2f357c") +
+  scale_fill_manual(values = pal) +
+scale_y_continuous(breaks = 1:5) +
+coord_cartesian(ylim = c(1, 5)) +
+  labs(
+    x = "Years of Experience",
+    y = "Perceived Value",
+    title = "Perceived Value by Years Experience"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+cor.test(YMHM_use$clin_experience,
+         YMHM_use$value_yhmh,
+         method = "pearson")
+
+```
+
+```{r}
+
+
+ggarrange(value_role, feas_role, accept_role, value_service, feas_service, accept_service, value_exp, feas_exp, accept_exp,
+          ncol = 3, nrow = 3, 
+          labels = c("A", "B", "C", "D", "E", "F", "G", "H", "I"))
+
+
+```
