@@ -2,7 +2,7 @@
 
 The Youth Mental Health Map is a digital, youth-centric self-report questionnaire designed to assess transdiagnostic mental health symptoms in young people.
 
-This repository contains the analysis scripts for the two-part study that developed and validated the Youth Mental Health Map, as well as code (both in Python and R) that can be used for scoring the four Youth Mental Health Map dimensions.
+This repository contains the analysis scripts for the four-part study that developed and validated the Youth Mental Health Map, as well as code (both in Python and R) that can be used for scoring the four Youth Mental Health Map dimensions.
 
 
 ---
